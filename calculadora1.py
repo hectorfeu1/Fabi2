@@ -4,7 +4,7 @@ import pandas as pd
 st.set_page_config(layout="wide")
 
 # =========================
-# SESSION STATE (CUSTOS)
+# SESSION STATE
 # =========================
 if "custos" not in st.session_state:
     st.session_state.custos = {
@@ -24,9 +24,6 @@ if "custos" not in st.session_state:
 
 c = st.session_state.custos
 
-# =========================
-# MARKETPLACES
-# =========================
 marketplaces = {
     "Amazon": {"comissao": 0.12},
     "Americanas": {"comissao": 0.17, "frete_percent": 0.08},
@@ -36,135 +33,106 @@ marketplaces = {
     "Shopee": {"comissao": 0.14},
 }
 
-# =========================
-# TITLE
-# =========================
-st.title("Calculadora de Margem - Fabricante Online")
+st.title("Calculadora de Margem")
 
 # =========================
-# INPUT MODO
+# INPUT PRODUTO
 # =========================
-modo = st.radio("Entrada de dados", ["Upload", "Manual"])
-
+modo = st.radio("Entrada", ["Upload", "Manual"])
 prod = None
 
-# =========================
-# UPLOAD
-# =========================
 if modo == "Upload":
-
-    file = st.file_uploader("Upload arquivo", type=["csv","txt"])
+    file = st.file_uploader("Arquivo", type=["csv","txt"])
 
     if file:
-        try:
-            try:
-                df = pd.read_csv(file, sep="\t", encoding="latin-1")
-            except:
-                df = pd.read_csv(file, sep=",", encoding="latin-1")
+        df = pd.read_csv(file)
+        df.columns = df.columns.str.lower()
 
-            df.columns = df.columns.str.strip().str.lower()
+        sku = st.text_input("SKU")
 
-            if not all(c in df.columns for c in ["sku","nome","custo_produto"]):
-                st.error("Arquivo precisa ter: sku, nome, custo_produto")
-                st.stop()
+        if sku:
+            row = df[df["sku"].astype(str) == sku]
+            if not row.empty:
+                prod = row.iloc[0].to_dict()
 
-            df["custo_produto"] = df["custo_produto"].astype(float)
-
-            sku = st.text_input("Digite o SKU")
-
-            if sku:
-                row = df[df["sku"].astype(str) == sku]
-
-                if row.empty:
-                    st.warning("SKU não encontrado")
-                else:
-                    prod = row.iloc[0].to_dict()  # ✅ PADRONIZAÇÃO
-
-        except Exception as e:
-            st.error(e)
-
-# =========================
-# MANUAL
-# =========================
 else:
-    st.subheader("Produto manual")
+    col1, col2, col3 = st.columns(3)
 
-    sku = st.text_input("SKU")
-    nome = st.text_input("Nome")
-    custo = st.number_input("Custo", 0.01)
+    with col1:
+        sku = st.text_input("SKU")
+    with col2:
+        nome = st.text_input("Produto")
+    with col3:
+        custo = st.number_input("Custo", 0.01)
 
     if sku and nome and custo > 0:
-        prod = {
-            "sku": sku,
-            "nome": nome,
-            "custo_produto": custo
-        }
+        prod = {"sku": sku, "nome": nome, "custo_produto": custo}
 
 # =========================
 # SE TEM PRODUTO
 # =========================
-if prod is not None:  # ✅ CORREÇÃO DO ERRO
+if prod is not None:
 
     st.subheader(prod["nome"])
     st.write(f"Custo: R$ {prod['custo_produto']:.2f}")
 
-    preco = st.number_input("Preço de venda", 0.01)
+    colp1, colp2 = st.columns(2)
+
+    with colp1:
+        preco = st.number_input("Preço", 0.01)
+
+    with colp2:
+        tipo_ml = st.selectbox("ML", ["Classico","Premium"])
 
     # =========================
     # DESCONTO
     # =========================
-    st.subheader("Desconto / Rebate")
+    st.markdown("### Desconto / Rebate")
 
     c1,c2,c3 = st.columns(3)
 
     with c1:
-        desconto = st.number_input("Desconto %",0.0,90.0,0.0)
-
+        desconto = st.number_input("Desc %",0.0,90.0,0.0)
     with c2:
-        desc_voce = st.number_input("% você paga",0.0,100.0,100.0)
-
+        desc_voce = st.number_input("Você %",0.0,100.0,100.0)
     with c3:
-        rebate = st.number_input("% canal paga",0.0,100.0,0.0)
+        rebate = st.number_input("Canal %",0.0,100.0,0.0)
 
     desconto /= 100
     desc_voce /= 100
     rebate /= 100
 
-    if round(desc_voce + rebate,4) != 1:
-        st.warning("Split precisa somar 100%")
-
-    tipo_ml = st.selectbox("Tipo anúncio ML",["Classico","Premium"])
-
     # =========================
-    # AJUSTE DE CUSTOS
+    # CUSTOS EM CARDS COMPACTOS
     # =========================
-    st.subheader("Ajuste de custos (dinâmico)")
+    st.markdown("### Custos")
 
     col1,col2,col3 = st.columns(3)
 
     with col1:
-        c["plataforma"] = st.number_input("Plataforma", value=c["plataforma"])
+        st.markdown("**Fixos**")
+        c["plataforma"] = st.number_input("Plat", value=c["plataforma"])
         c["erp"] = st.number_input("ERP", value=c["erp"])
-        c["ferramentas"] = st.number_input("Ferramentas", value=c["ferramentas"])
+        c["ferramentas"] = st.number_input("Tools", value=c["ferramentas"])
 
     with col2:
+        st.markdown("**Operação**")
         c["operacao"] = st.number_input("Operação", value=c["operacao"])
-        c["marketing"] = st.number_input("Marketing", value=c["marketing"])
+        c["marketing"] = st.number_input("Mkt", value=c["marketing"])
         c["outros"] = st.number_input("Outros", value=c["outros"])
 
     with col3:
-        c["pedidos_mes"] = st.number_input("Pedidos/mês", value=c["pedidos_mes"])
-        c["custo_pedido"] = st.number_input("Custo/pedido", value=c["custo_pedido"])
-        c["armazenagem"] = st.number_input("Armazenagem %", value=c["armazenagem"])
+        st.markdown("**Variáveis**")
+        c["pedidos_mes"] = st.number_input("Pedidos", value=c["pedidos_mes"])
+        c["custo_pedido"] = st.number_input("Pedido R$", value=c["custo_pedido"])
+        c["armazenagem"] = st.number_input("Armaz %", value=c["armazenagem"])
 
     col4,col5,col6 = st.columns(3)
 
     with col4:
         c["icms"] = st.number_input("ICMS", value=c["icms"])
-
     with col5:
         c["difal"] = st.number_input("DIFAL", value=c["difal"])
-
     with col6:
         c["pis_cofins"] = st.number_input("PIS/COFINS", value=c["pis_cofins"])
 
@@ -181,33 +149,26 @@ if prod is not None:  # ✅ CORREÇÃO DO ERRO
 
         receita = preco_desc + parte_canal
 
-        st.subheader("Memória de cálculo")
-
         st.markdown(f"""
-Preço original: **R$ {preco:.2f}**  
-Preço com desconto: **R$ {preco_desc:.2f}**
+        **Receita:** R$ {receita:.2f} |  
+        **Você paga:** R$ {parte_voce:.2f} |  
+        **Canal paga:** R$ {parte_canal:.2f}
+        """)
 
-Desconto total: **R$ {valor_desc:.2f}**
-
-Você paga: **R$ {parte_voce:.2f}**  
-Canal paga (rebate): **R$ {parte_canal:.2f}**
-
-**Receita final: R$ {receita:.2f}**
-""")
-
-        # =========================
-        # CUSTOS DINÂMICOS
-        # =========================
-        custos_fixos = (
-            c["plataforma"] + c["erp"] + c["ferramentas"] +
-            c["operacao"] + c["marketing"] + c["outros"]
-        )
+        custos_fixos = sum([
+            c["plataforma"], c["erp"], c["ferramentas"],
+            c["operacao"], c["marketing"], c["outros"]
+        ])
 
         fixo = custos_fixos / c["pedidos_mes"]
-
         impostos_total = c["icms"] + c["difal"] + c["pis_cofins"]
 
-        st.subheader("Resultado por marketplace")
+        # =========================
+        # RESULTADOS EM CARDS
+        # =========================
+        st.markdown("### Resultados")
+
+        resultados = []
 
         for nome,dados in marketplaces.items():
 
@@ -218,9 +179,6 @@ Canal paga (rebate): **R$ {parte_canal:.2f}**
             if nome == "Mercado Livre":
                 comissao_percent = 0.12 if tipo_ml=="Classico" else 0.17
                 frete = 23
-
-                if receita < 79:
-                    taxa_extra = 6.75
 
             elif nome == "Shopee":
                 frete = 0
@@ -239,17 +197,36 @@ Canal paga (rebate): **R$ {parte_canal:.2f}**
             armazenagem = receita * c["armazenagem"]
 
             custo_total = (
-                prod["custo_produto"] +
-                comissao +
-                frete +
-                impostos +
-                armazenagem +
-                fixo +
-                c["custo_pedido"] +
-                taxa_extra
+                prod["custo_produto"] + comissao + frete +
+                impostos + armazenagem + fixo +
+                c["custo_pedido"] + taxa_extra
             )
 
             lucro = receita - custo_total
             margem = (lucro/receita)*100 if receita>0 else 0
 
-            st.write(f"{nome} → Lucro: R$ {lucro:.2f} | Margem: {margem:.2f}%")
+            resultados.append((nome, lucro, margem))
+
+        cols = st.columns(3)
+
+        for i,(nome,lucro,margem) in enumerate(resultados):
+
+            if margem < 2:
+                cor = "#ff4b4b"
+            elif margem <= 5:
+                cor = "#f0ad4e"
+            else:
+                cor = "#28a745"
+
+            with cols[i % 3]:
+                st.markdown(f"""
+                <div style="
+                border:2px solid {cor};
+                border-radius:12px;
+                padding:12px;
+                text-align:center;">
+                <b>{nome}</b><br>
+                Lucro<br><b>R$ {lucro:.2f}</b><br>
+                Margem<br><b>{margem:.2f}%</b>
+                </div>
+                """, unsafe_allow_html=True)
