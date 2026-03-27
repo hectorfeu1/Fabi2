@@ -24,6 +24,9 @@ if "custos" not in st.session_state:
 
 c = st.session_state.custos
 
+# =========================
+# MARKETPLACES
+# =========================
 marketplaces = {
     "Amazon": {"comissao": 0.12},
     "Americanas": {"comissao": 0.17, "frete_percent": 0.08},
@@ -42,17 +45,26 @@ modo = st.radio("Entrada", ["Upload", "Manual"])
 prod = None
 
 # =========================
-# UPLOAD (ROBUSTO)
+# UPLOAD (AJUSTADO PARA TXT TAB)
 # =========================
 if modo == "Upload":
-    file = st.file_uploader("Arquivo", type=["csv","txt"])
+
+    file = st.file_uploader("Arquivo (.txt ou .csv)", type=["csv","txt"])
 
     if file:
         try:
             try:
-                df = pd.read_csv(file, sep=None, engine="python", encoding="utf-8")
+                df = pd.read_csv(file, sep="\t", encoding="latin-1")
             except:
-                df = pd.read_csv(file, sep=None, engine="python", encoding="latin-1")
+                try:
+                    df = pd.read_csv(file, sep="\t", encoding="utf-8")
+                except:
+                    df = pd.read_csv(file, sep=None, engine="python", encoding="latin-1")
+
+            # validação de leitura
+            if len(df.columns) == 1:
+                st.error("Arquivo não foi interpretado corretamente (esperado separador TAB).")
+                st.stop()
 
             df.columns = df.columns.str.strip().str.lower()
 
@@ -62,7 +74,12 @@ if modo == "Upload":
 
             df["custo_produto"] = df["custo_produto"].astype(float)
 
-            sku = st.text_input("SKU")
+            st.success(f"{len(df)} produtos carregados")
+
+            st.write("Preview do arquivo:")
+            st.dataframe(df.head())
+
+            sku = st.text_input("Digite o SKU")
 
             if sku:
                 row = df[df["sku"].astype(str) == sku]
@@ -79,6 +96,7 @@ if modo == "Upload":
 # MANUAL
 # =========================
 else:
+
     col1, col2, col3 = st.columns(3)
 
     with col1:
