@@ -4,7 +4,7 @@ import pandas as pd
 PEDIDOS_MES = 10000
 
 marketplaces = {
-    "Amazon": {"comissao": 0.15},
+    "Amazon": {"comissao": 0.12},
     "Americanas": {"comissao": 0.17, "frete_percent": 0.08},
     "Magalu": {"comissao": 0.148},
     "Mercado Livre": {"comissao": 0.17},
@@ -85,10 +85,17 @@ if uploaded_file is not None:
         desc_voce /= 100
         rebate /= 100
 
+        # Validação do split
+        if round(desc_voce + rebate, 4) != 1:
+            st.warning("A soma de '% pago por você' + '% pago pelo canal' deve ser 100%")
+
         tipo_ml = st.selectbox("Tipo anúncio ML",["Classico","Premium"])
 
         if preco > 0:
 
+            # =========================
+            # MEMÓRIA DE CÁLCULO REBATE
+            # =========================
             preco_desc = preco * (1 - desconto)
             valor_desc = preco - preco_desc
 
@@ -97,19 +104,46 @@ if uploaded_file is not None:
 
             receita = preco_desc + parte_canal
 
-            st.info(f"""
-Preço original: R$ {preco:.2f}
+            pct_desc_total = desconto * 100
+            pct_voce_real = (parte_voce / preco) * 100 if preco > 0 else 0
+            pct_canal_real = (parte_canal / preco) * 100 if preco > 0 else 0
 
-Preço com desconto: R$ {preco_desc:.2f}
+            impacto_rebate = (parte_canal / receita) * 100 if receita > 0 else 0
 
-Desconto total: R$ {valor_desc:.2f}
+            st.subheader("Memória de cálculo do desconto / rebate")
 
-Parte paga por você: R$ {parte_voce:.2f}
+            st.markdown(f"""
+**Preço original:** R$ {preco:.2f}  
+**Preço com desconto:** R$ {preco_desc:.2f}  
 
-Rebate canal: R$ {parte_canal:.2f}
+---
 
-Receita final: R$ {receita:.2f}
+### Desconto aplicado
+- % desconto total: **{pct_desc_total:.2f}%**
+- Valor total: **R$ {valor_desc:.2f}**
+
+---
+
+### Split do desconto
+**Você absorve:**
+- R$ {parte_voce:.2f}
+- {pct_voce_real:.2f}% do preço
+
+**Canal (rebate):**
+- R$ {parte_canal:.2f}
+- {pct_canal_real:.2f}% do preço
+
+---
+
+### Resultado final
+**Receita líquida após rebate: R$ {receita:.2f}**
+
+Rebate representa **{impacto_rebate:.2f}% da receita**
 """)
+
+            # =========================
+            # CÁLCULO DE MARGEM
+            # =========================
 
             fixo = custos_fixos_mensais / PEDIDOS_MES
 
@@ -148,7 +182,10 @@ Receita final: R$ {receita:.2f}
 
                 elif nome == "Amazon":
 
-                    frete = 23
+                    if preco_desc < 79:
+                        frete = 6.50
+                    else:
+                        frete = 21.90
 
                 elif nome == "Magalu":
 
