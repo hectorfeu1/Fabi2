@@ -41,20 +41,43 @@ st.title("Calculadora de Margem")
 modo = st.radio("Entrada", ["Upload", "Manual"])
 prod = None
 
+# =========================
+# UPLOAD (ROBUSTO)
+# =========================
 if modo == "Upload":
     file = st.file_uploader("Arquivo", type=["csv","txt"])
 
     if file:
-        df = pd.read_csv(file)
-        df.columns = df.columns.str.lower()
+        try:
+            try:
+                df = pd.read_csv(file, sep=None, engine="python", encoding="utf-8")
+            except:
+                df = pd.read_csv(file, sep=None, engine="python", encoding="latin-1")
 
-        sku = st.text_input("SKU")
+            df.columns = df.columns.str.strip().str.lower()
 
-        if sku:
-            row = df[df["sku"].astype(str) == sku]
-            if not row.empty:
-                prod = row.iloc[0].to_dict()
+            if not all(c in df.columns for c in ["sku","nome","custo_produto"]):
+                st.error("Arquivo precisa ter: sku, nome, custo_produto")
+                st.stop()
 
+            df["custo_produto"] = df["custo_produto"].astype(float)
+
+            sku = st.text_input("SKU")
+
+            if sku:
+                row = df[df["sku"].astype(str) == sku]
+
+                if row.empty:
+                    st.warning("SKU não encontrado")
+                else:
+                    prod = row.iloc[0].to_dict()
+
+        except Exception as e:
+            st.error(f"Erro ao ler arquivo: {e}")
+
+# =========================
+# MANUAL
+# =========================
 else:
     col1, col2, col3 = st.columns(3)
 
@@ -102,8 +125,11 @@ if prod is not None:
     desc_voce /= 100
     rebate /= 100
 
+    if round(desc_voce + rebate,4) != 1:
+        st.warning("Split precisa somar 100%")
+
     # =========================
-    # CUSTOS EM CARDS COMPACTOS
+    # CUSTOS COMPACTOS
     # =========================
     st.markdown("### Custos")
 
@@ -150,8 +176,8 @@ if prod is not None:
         receita = preco_desc + parte_canal
 
         st.markdown(f"""
-        **Receita:** R$ {receita:.2f} |  
-        **Você paga:** R$ {parte_voce:.2f} |  
+        **Receita:** R$ {receita:.2f}  
+        **Você paga:** R$ {parte_voce:.2f}  
         **Canal paga:** R$ {parte_canal:.2f}
         """)
 
@@ -179,6 +205,8 @@ if prod is not None:
             if nome == "Mercado Livre":
                 comissao_percent = 0.12 if tipo_ml=="Classico" else 0.17
                 frete = 23
+                if receita < 79:
+                    taxa_extra = 6.75
 
             elif nome == "Shopee":
                 frete = 0
