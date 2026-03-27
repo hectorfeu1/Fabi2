@@ -65,16 +65,20 @@ if modo == "Upload":
             df.columns = df.columns.str.strip().str.lower()
 
             if not all(c in df.columns for c in ["sku","nome","custo_produto"]):
-                st.error("Arquivo inválido")
+                st.error("Arquivo precisa ter: sku, nome, custo_produto")
                 st.stop()
 
-            sku = st.text_input("SKU")
+            df["custo_produto"] = df["custo_produto"].astype(float)
+
+            sku = st.text_input("Digite o SKU")
 
             if sku:
                 row = df[df["sku"].astype(str) == sku]
 
-                if not row.empty:
-                    prod = row.iloc[0]
+                if row.empty:
+                    st.warning("SKU não encontrado")
+                else:
+                    prod = row.iloc[0].to_dict()  # ✅ PADRONIZAÇÃO
 
         except Exception as e:
             st.error(e)
@@ -90,12 +94,16 @@ else:
     custo = st.number_input("Custo", 0.01)
 
     if sku and nome and custo > 0:
-        prod = {"sku": sku, "nome": nome, "custo_produto": custo}
+        prod = {
+            "sku": sku,
+            "nome": nome,
+            "custo_produto": custo
+        }
 
 # =========================
 # SE TEM PRODUTO
 # =========================
-if prod:
+if prod is not None:  # ✅ CORREÇÃO DO ERRO
 
     st.subheader(prod["nome"])
     st.write(f"Custo: R$ {prod['custo_produto']:.2f}")
@@ -125,7 +133,7 @@ if prod:
     if round(desc_voce + rebate,4) != 1:
         st.warning("Split precisa somar 100%")
 
-    tipo_ml = st.selectbox("ML",["Classico","Premium"])
+    tipo_ml = st.selectbox("Tipo anúncio ML",["Classico","Premium"])
 
     # =========================
     # AJUSTE DE CUSTOS
@@ -161,7 +169,7 @@ if prod:
         c["pis_cofins"] = st.number_input("PIS/COFINS", value=c["pis_cofins"])
 
     # =========================
-    # CÁLCULOS
+    # CÁLCULO
     # =========================
     if preco > 0:
 
@@ -175,13 +183,21 @@ if prod:
 
         st.subheader("Memória de cálculo")
 
-        st.write(f"Preço final: R$ {preco_desc:.2f}")
-        st.write(f"Desconto total: R$ {valor_desc:.2f}")
-        st.write(f"Você paga: R$ {parte_voce:.2f}")
-        st.write(f"Canal paga: R$ {parte_canal:.2f}")
-        st.write(f"Receita: R$ {receita:.2f}")
+        st.markdown(f"""
+Preço original: **R$ {preco:.2f}**  
+Preço com desconto: **R$ {preco_desc:.2f}**
 
-        # custos dinâmicos
+Desconto total: **R$ {valor_desc:.2f}**
+
+Você paga: **R$ {parte_voce:.2f}**  
+Canal paga (rebate): **R$ {parte_canal:.2f}**
+
+**Receita final: R$ {receita:.2f}**
+""")
+
+        # =========================
+        # CUSTOS DINÂMICOS
+        # =========================
         custos_fixos = (
             c["plataforma"] + c["erp"] + c["ferramentas"] +
             c["operacao"] + c["marketing"] + c["outros"]
@@ -191,7 +207,7 @@ if prod:
 
         impostos_total = c["icms"] + c["difal"] + c["pis_cofins"]
 
-        st.subheader("Resultado")
+        st.subheader("Resultado por marketplace")
 
         for nome,dados in marketplaces.items():
 
@@ -202,6 +218,9 @@ if prod:
             if nome == "Mercado Livre":
                 comissao_percent = 0.12 if tipo_ml=="Classico" else 0.17
                 frete = 23
+
+                if receita < 79:
+                    taxa_extra = 6.75
 
             elif nome == "Shopee":
                 frete = 0
